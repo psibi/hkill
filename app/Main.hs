@@ -43,11 +43,15 @@ newline :: String
 newline = "\n"
 
 logWidget :: [String] -> Widget SearchWidget
-logWidget logs = str ("LOG MESSAGES" <> newline <> newline <> fold logs)
+logWidget logs = viewport Logger Vertical $ str ("LOG MESSAGES" <> newline <> fold logs)
+
+loggerScroll :: M.ViewportScroll SearchWidget
+loggerScroll = M.viewportScroll Logger
 
 data SearchWidget
   = SearchEdit
   | SearchResult
+  | Logger
   deriving (Ord, Show, Eq)
 
 data KillState = KillState
@@ -62,7 +66,7 @@ makeLenses ''KillState
 initialState :: KillState
 initialState =
   KillState
-  { _focusRing = F.focusRing [SearchEdit, SearchResult]
+  { _focusRing = F.focusRing [SearchEdit, SearchResult, Logger]
   , _searchEdit = E.editor SearchEdit (Just 1) ""
   , _searchResult = killResultsView
   , _logMessages = []
@@ -76,7 +80,7 @@ listDrawElement sel a =
     in selStr a
 
 sampleLog :: [String]
-sampleLog = ["Process emacs", newline, "PID 3", newline, "Memory 30 MB"]
+sampleLog = [newline, "Process emacs", newline, "PID 3", newline, "Memory 30 MB"]
 
 drawUI :: KillState -> [Widget SearchWidget]
 drawUI st = [ui]
@@ -109,6 +113,10 @@ appCursor
   -> Maybe (T.CursorLocation SearchWidget)
 appCursor = F.focusRingCursor (^. focusRing)
 
+
+handleLoggerViewEVent :: V.Event -> Widget SearchWidget -> T.EventM SearchWidget (T.Next KillState)
+handleLoggerViewEVent = error "nopey"
+
 appEvent
   :: KillState
   -> T.BrickEvent SearchWidget e
@@ -117,7 +125,7 @@ appEvent st (T.VtyEvent ev) =
   case ev of
     V.EvKey V.KEsc [] -> M.halt st
     V.EvKey (V.KChar '\t') [] -> M.continue $ st & focusRing %~ F.focusNext
-    V.EvKey (V.KChar 'i') [] -> M.continue $ st { _logMessages = sampleLog }
+    V.EvKey (V.KChar 'i') [] -> M.continue $ st & logMessages %~ (++ sampleLog)
     V.EvKey V.KBackTab [] -> M.continue $ st & focusRing %~ F.focusPrev
     _ ->
       M.continue =<<
@@ -126,6 +134,10 @@ appEvent st (T.VtyEvent ev) =
           T.handleEventLensed st searchEdit E.handleEditorEvent ev
         Just SearchResult ->
           T.handleEventLensed st searchResult handleListEvent ev
+        Just Logger -> case ev of
+                         V.EvKey V.KUp [] -> M.vScrollBy loggerScroll (-1) >> return st
+                         V.EvKey V.KDown [] -> M.vScrollBy loggerScroll 1 >> return st
+                         _ -> return st
         Nothing -> return st
 appEvent st _ = M.continue st
 
