@@ -69,7 +69,8 @@ initialState =
 listDrawElement :: Bool -> String -> Widget SearchWidget
 listDrawElement sel a = 
     let selStr s = if sel
-                   then (str $ "<" <> a <> ">")
+                   then str s
+                   -- then withAttr customAttr $ (str s)
                    else str s
     in selStr a
 
@@ -140,7 +141,14 @@ theMap =
     V.defAttr
     [ (E.editAttr, V.white `on` V.blue)
     , (E.editFocusedAttr, V.black `on` V.yellow)
+    , ("resultView", V.cyan `on` V.black)
+    , (listAttr,            fg V.cyan)
+    , (listSelectedFocusedAttr, V.black `on` V.yellow)
+    , (customAttr,            fg V.cyan)
     ]
+
+customAttr :: A.AttrName
+customAttr = listSelectedAttr <> "custom"
 
 main :: IO ()
 main = defaultMain killApp initialState >> return ()
