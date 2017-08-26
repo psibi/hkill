@@ -42,8 +42,8 @@ bindings =
 newline :: String
 newline = "\n"
 
-logWidget :: Widget SearchWidget
-logWidget = (str ("LOG MESSAGES \n\nTest 1 msg"))
+logWidget :: [String] -> Widget SearchWidget
+logWidget logs = str ("LOG MESSAGES" <> newline <> newline <> fold logs)
 
 data SearchWidget
   = SearchEdit
@@ -54,6 +54,7 @@ data KillState = KillState
   { _focusRing :: F.FocusRing SearchWidget
   , _searchEdit :: E.Editor String SearchWidget
   , _searchResult :: List SearchWidget String
+  , _logMessages :: [String]
   }
 
 makeLenses ''KillState
@@ -64,16 +65,18 @@ initialState =
   { _focusRing = F.focusRing [SearchEdit, SearchResult]
   , _searchEdit = E.editor SearchEdit (Just 1) ""
   , _searchResult = killResultsView
+  , _logMessages = []
   }
 
 listDrawElement :: Bool -> String -> Widget SearchWidget
 listDrawElement sel a = 
     let selStr s = if sel
-                   then str s
-                   -- then withAttr customAttr $ (str s)
+                   then str $ ("* " <> s )
                    else str s
     in selStr a
 
+sampleLog :: [String]
+sampleLog = ["Process emacs", newline, "PID 3", newline, "Memory 30 MB"]
 
 drawUI :: KillState -> [Widget SearchWidget]
 drawUI st = [ui]
@@ -94,7 +97,7 @@ drawUI st = [ui]
       borderWithLabel (str "hkill") $
       vBox
         [ (((str "Search ") <+> edit1) <=> hBorder <=> resultView) <+>
-          vBorder <+> (keyBindingWidget <=> hBorder <=> logWidget)
+          vBorder <+> (keyBindingWidget <=> hBorder <=> logWidget (st ^. logMessages))
         ]
 
 killResultsView :: List SearchWidget String
@@ -114,6 +117,7 @@ appEvent st (T.VtyEvent ev) =
   case ev of
     V.EvKey V.KEsc [] -> M.halt st
     V.EvKey (V.KChar '\t') [] -> M.continue $ st & focusRing %~ F.focusNext
+    V.EvKey (V.KChar 'i') [] -> M.continue $ st { _logMessages = sampleLog }
     V.EvKey V.KBackTab [] -> M.continue $ st & focusRing %~ F.focusPrev
     _ ->
       M.continue =<<
@@ -141,14 +145,9 @@ theMap =
     V.defAttr
     [ (E.editAttr, V.white `on` V.blue)
     , (E.editFocusedAttr, V.black `on` V.yellow)
-    , ("resultView", V.cyan `on` V.black)
     , (listAttr,            fg V.cyan)
     , (listSelectedFocusedAttr, V.black `on` V.yellow)
-    , (customAttr,            fg V.cyan)
     ]
-
-customAttr :: A.AttrName
-customAttr = listSelectedAttr <> "custom"
 
 main :: IO ()
 main = defaultMain killApp initialState >> return ()
