@@ -26,6 +26,9 @@ executable hkill-exe
   build-depends:       base
                      , brick
                      , hkill
+                     , microlens
+                     , microlens-th
+                     , vty
   default-language:    Haskell2010
 
 test-suite hkill-test
