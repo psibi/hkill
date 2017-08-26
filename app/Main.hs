@@ -67,7 +67,12 @@ initialState =
   }
 
 listDrawElement :: Bool -> String -> Widget SearchWidget
-listDrawElement sel a = str $ "Proces " <> a
+listDrawElement sel a = 
+    let selStr s = if sel
+                   then (str $ "<" <> a <> ">")
+                   else str s
+    in selStr a
+
 
 drawUI :: KillState -> [Widget SearchWidget]
 drawUI st = [ui]
