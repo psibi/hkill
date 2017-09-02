@@ -150,14 +150,7 @@ appEvent st (T.VtyEvent ev) =
                 newSt = st' {_searchResult = killResultsView filterProcesses}
             M.continue newSt
         Just SearchResult -> do
-          let searchStr :: String = fold $ E.getEditContents $ _searchEdit st
-              filterProcesses =
-                if searchStr == []
-                  then sampleProcesses
-                  else filter (\x -> searchStr `isPrefixOf` x) sampleProcesses
-              newSt = st {_searchResult = killResultsView filterProcesses}
-          M.continue =<<
-            T.handleEventLensed newSt searchResult handleListEvent ev
+          M.continue =<< T.handleEventLensed st searchResult handleListEvent ev
         Just Logger ->
           case ev of
             V.EvKey V.KUp [] ->
