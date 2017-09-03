@@ -42,7 +42,7 @@ bindings =
   , newline
   , "Ctrl-K : Send SIGKILL (kill -9)"
   , newline
-  , "Ctrl-i : Process information"
+  , "Alt-i : Process information"
   , newline
   , "r : Refresh"
   ]
@@ -160,10 +160,16 @@ appEvent st (T.VtyEvent ev) =
           case procs of
             [] -> M.continue st
             ((Right process):_) -> do
-              liftIO $ softKill (procPid process)
+              kstatus <- liftIO $ softKill (procPid process)
+              let statusLog =
+                    case kstatus of
+                      KillDone -> ""
+                      KillError errorMsg -> show errorMsg
               let newlog =
                     [ newline
                     , "SIGTERM signal sent to " <> (show $ procPid process)
+                    , newline
+                    , statusLog
                     , newline
                     ]
               M.continue $ st & logMessages %~ (++ newlog)
