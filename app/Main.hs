@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -23,7 +24,7 @@ import qualified Graphics.Vty as V
 import Lens.Micro
 import Lens.Micro.TH
 import System.Linux.Process
-import Data.Text (Text)
+import Data.Text (Text, pack)
 import qualified Data.Text as Text
 import Data.Either (isRight)
 
@@ -88,9 +89,21 @@ listDrawElement sel a =
           else txt s
   in selStr a
 
-sampleLog :: [String]
-sampleLog =
-  [newline, "Process emacs", newline, "PID 3", newline, "Memory 30 MB"]
+renderProcessInfo :: ProcessInfo -> [String]
+renderProcessInfo ProcessInfo {..} =
+  [
+    newline
+  , Text.unpack procName
+  , newline
+  , "PID " <> (show $ pid procPid)
+  , newline
+  , "PPID " <> (show $ pid procPpid)
+  , newline
+  , "Memory size " <> Text.unpack procVmSize
+  , newline
+  , "Threads: " <> show procThreads
+  , newline
+  ]
 
 drawUI :: KillState -> [Widget SearchWidget]
 drawUI st = [ui]
@@ -118,33 +131,52 @@ drawUI st = [ui]
 killResultsView :: [Text] -> List SearchWidget Text
 killResultsView xs = list SearchResult (Vec.fromList xs) 1
 
-appCursor ::
-     KillState
+appCursor
+  :: KillState
   -> [T.CursorLocation SearchWidget]
   -> Maybe (T.CursorLocation SearchWidget)
 appCursor = F.focusRingCursor (^. focusRing)
 
-appEvent ::
-     KillState
+appEvent
+  :: KillState
   -> T.BrickEvent SearchWidget e
   -> T.EventM SearchWidget (T.Next KillState)
 appEvent st (T.VtyEvent ev) =
   case ev of
     V.EvKey V.KEsc [] -> M.halt st
     V.EvKey (V.KChar '\t') [] -> M.continue $ st & focusRing %~ F.focusNext
-    V.EvKey (V.KChar 'j') [V.MMeta] -> M.continue $ st & logMessages %~ (++ sampleLog)
+    V.EvKey (V.KChar 'j') [V.MMeta] -> do
+      let (currentProcess :: Maybe Pid) =
+            case listSelectedElement (st ^. searchResult) of
+              Nothing -> Nothing
+              Just (_, pname) -> either (const Nothing) Just (selectedPid pname)
+      case currentProcess of
+        Nothing -> M.continue st
+        Just pid -> do
+          let procs = filterPid pid (st ^. systemProcesses)
+          case procs of
+            [] -> M.continue st
+            ((Right process):_) -> M.continue $ st & logMessages %~ (++ renderProcessInfo process)
+            _ -> M.continue st
     V.EvKey V.KBackTab [] -> M.continue $ st & focusRing %~ F.focusPrev
     _ ->
       case F.focusGetCurrent (st ^. focusRing) of
         Just SearchEdit -> do
-          T.handleEventLensed st searchEdit E.handleEditorEvent ev >>= \st' -> do
-            let searchStr :: Text = Text.pack $ fold $ E.getEditContents $ _searchEdit st'
-                filterProcesses =
-                  if searchStr == ""
-                    then processesToNames $ st ^. systemProcesses
-                    else filter (\x -> searchStr `Text.isPrefixOf` x) (processesToNames $ st ^. systemProcesses)
-                newSt = st' {_searchResult = killResultsView filterProcesses}
-            M.continue newSt
+          T.handleEventLensed st searchEdit E.handleEditorEvent ev >>=
+            \st' -> do
+              let searchStr :: Text =
+                    Text.pack $ fold $ E.getEditContents $ _searchEdit st'
+                  filterProcesses =
+                    if searchStr == ""
+                      then processesToNames $ st ^. systemProcesses
+                      else filter
+                             (\x -> searchStr `Text.isPrefixOf` x)
+                             (processesToNames $ st ^. systemProcesses)
+                  newSt =
+                    st'
+                    { _searchResult = killResultsView filterProcesses
+                    }
+              M.continue newSt
         Just SearchResult -> do
           M.continue =<< T.handleEventLensed st searchResult handleListEvent ev
         Just Logger ->
@@ -178,16 +210,30 @@ theMap =
     , ("foundFull", V.black `on` V.yellow)
     ]
 
+renderProcess :: ProcessInfo -> Text
+renderProcess ps =
+  procName ps <> " (" <> (pack $ show $ pid $ procPid ps) <> ")"
+
 processesToNames :: [Either String ProcessInfo] -> [Text]
-processesToNames procs = filter (\x -> x /= "") $ map (either (const "") procName) procs
+processesToNames procs =
+  filter (\x -> x /= "") $ map (either (const "") renderProcess) procs
 
 main :: IO ()
 main = do
   procs <- getAllProcessInfoDS
   defaultMain killApp $ initialState procs
   return ()
-
 -- main :: IO ()
 -- main = do
---   x <- test
+--   let x = selectedPid "polkitd (1043)"
 --   print x
+
+
+
+
+
+
+
+
+
+
