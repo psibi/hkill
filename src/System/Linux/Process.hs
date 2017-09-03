@@ -65,6 +65,17 @@ parseProcessInfo = do
   procThreads <- skipWhile isHorizontalSpace *> takeTill isEndOfLine >>= intParser
   return $ ProcessInfo { .. }
 
+parsePid :: Parser Pid
+parsePid = do
+  takeTill (== '(')
+  char '('
+  pid <- decimal
+  char ')'
+  return $ Pid pid
+
+selectedPid :: Text -> Either String Pid
+selectedPid = parseOnly parsePid
+
 getProcessInfo :: Pid -> IO String
 getProcessInfo pid = do
   !contents <- readFile (processInfo pid)
@@ -94,3 +105,10 @@ getAllProcessInfoDS :: IO [Either String ProcessInfo]
 getAllProcessInfoDS = do
   pinfos <- getAllProcessInfo
   return $ map (\p -> parseOnly parseProcessInfo (pack p)) pinfos
+
+samePid :: Pid -> Either String ProcessInfo -> Bool
+samePid _ (Left _) = False
+samePid pid (Right pinfo) = (procPid pinfo) == pid
+
+filterPid :: Pid -> [Either String ProcessInfo] -> [Either String ProcessInfo]
+filterPid pid = filter (samePid pid)
