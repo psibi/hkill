@@ -1,7 +1,7 @@
-{-#LANGUAGE BangPatterns#-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE OverloadedStrings#-}
-{-# LANGUAGE ScopedTypeVariables#-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module System.Linux.Process where
 
@@ -14,17 +14,20 @@ import System.FilePath (takeFileName, (</>))
 import System.Posix.Files (isDirectory, getFileStatus)
 import System.Directory (listDirectory)
 import Control.Monad (filterM)
+import System.Posix.Signals
 
-newtype Pid = Pid { pid :: Int } deriving (Show, Read, Eq, Ord)
+newtype Pid = Pid
+  { pid :: Int
+  } deriving (Show, Read, Eq, Ord)
 
-data ProcessInfo = ProcessInfo {
-  procName :: Text,
-  procState :: Text,
-  procPid :: Pid,
-  procPpid :: Pid,
-  procVmSize :: Text,
-  procThreads :: Int
-} deriving (Show, Eq, Ord)
+data ProcessInfo = ProcessInfo
+  { procName :: Text
+  , procState :: Text
+  , procPid :: Pid
+  , procPpid :: Pid
+  , procVmSize :: Text
+  , procThreads :: Int
+  } deriving (Show, Eq, Ord)
 
 procFs :: String
 procFs = "/proc"
@@ -56,14 +59,17 @@ parseProcessInfo = do
   procPid <- skipWhile isHorizontalSpace *> takeTill isEndOfLine >>= pidParser
   endOfLine
   skipLines_ "PPid:"
-  procPpid <- skipWhile isHorizontalSpace *> takeTill isEndOfLine >>= pidParser       
+  procPpid <- skipWhile isHorizontalSpace *> takeTill isEndOfLine >>= pidParser
   endOfLine
   skipLines_ "VmSize:"
   procVmSize <- skipWhile isHorizontalSpace *> takeTill isEndOfLine
   endOfLine
   skipLines_ "Threads:"
   procThreads <- skipWhile isHorizontalSpace *> takeTill isEndOfLine >>= intParser
-  return $ ProcessInfo { .. }
+  return $
+    ProcessInfo
+    { ..
+    }
 
 parsePid :: Parser Pid
 parsePid = do
@@ -112,3 +118,9 @@ samePid pid (Right pinfo) = (procPid pinfo) == pid
 
 filterPid :: Pid -> [Either String ProcessInfo] -> [Either String ProcessInfo]
 filterPid pid = filter (samePid pid)
+
+softKill :: Pid -> IO ()
+softKill (Pid pid) = signalProcess softwareTermination (fromIntegral pid)
+
+hardKill :: Pid -> IO ()
+hardKill (Pid pid) = signalProcess killProcess (fromIntegral pid)
