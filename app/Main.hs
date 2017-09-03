@@ -91,8 +91,7 @@ listDrawElement sel a =
 
 renderProcessInfo :: ProcessInfo -> [String]
 renderProcessInfo ProcessInfo {..} =
-  [
-    newline
+  [ newline
   , Text.unpack procName
   , newline
   , "PID " <> (show $ pid procPid)
@@ -145,6 +144,8 @@ appEvent st (T.VtyEvent ev) =
   case ev of
     V.EvKey V.KEsc [] -> M.halt st
     V.EvKey (V.KChar '\t') [] -> M.continue $ st & focusRing %~ F.focusNext
+    V.EvKey (V.KChar 'n') [V.MCtrl] -> M.continue $ st & searchResult %~ listMoveDown
+    V.EvKey (V.KChar 'p') [V.MCtrl] -> M.continue $ st & searchResult %~ listMoveUp
     V.EvKey (V.KChar 'j') [V.MMeta] -> do
       let (currentProcess :: Maybe Pid) =
             case listSelectedElement (st ^. searchResult) of
@@ -156,7 +157,8 @@ appEvent st (T.VtyEvent ev) =
           let procs = filterPid pid (st ^. systemProcesses)
           case procs of
             [] -> M.continue st
-            ((Right process):_) -> M.continue $ st & logMessages %~ (++ renderProcessInfo process)
+            ((Right process):_) ->
+              M.continue $ st & logMessages %~ (++ renderProcessInfo process)
             _ -> M.continue st
     V.EvKey V.KBackTab [] -> M.continue $ st & focusRing %~ F.focusPrev
     _ ->
@@ -227,13 +229,3 @@ main = do
 -- main = do
 --   let x = selectedPid "polkitd (1043)"
 --   print x
-
-
-
-
-
-
-
-
-
-
