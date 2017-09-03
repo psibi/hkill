@@ -157,7 +157,8 @@ appEvent st (T.VtyEvent ev) =
           let procs = filterPid pid (st ^. systemProcesses)
           case procs of
             [] -> M.continue st
-            ((Right process):_) ->
+            ((Right process):_) -> do
+              M.vScrollToEnd loggerScroll
               M.continue $ st & logMessages %~ (++ renderProcessInfo process)
             _ -> M.continue st
     V.EvKey V.KBackTab [] -> M.continue $ st & focusRing %~ F.focusPrev
