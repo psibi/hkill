@@ -44,7 +44,7 @@ bindings =
   , newline
   , "Alt-i : Process information"
   , newline
-  , "r : Refresh"
+  , "Ctrl-r : Refresh Process List"
   ]
 
 newline :: String
@@ -148,6 +148,10 @@ appEvent st (T.VtyEvent ev) =
     V.EvKey (V.KChar '\t') [] -> M.continue $ st & focusRing %~ F.focusNext
     V.EvKey (V.KChar 'n') [V.MCtrl] -> M.continue $ st & searchResult %~ listMoveDown
     V.EvKey (V.KChar 'p') [V.MCtrl] -> M.continue $ st & searchResult %~ listMoveUp
+    V.EvKey (V.KChar 'r') [V.MCtrl] -> do
+      procs <- liftIO getAllProcessInfoDS
+      let newLog = [newline, "Process list refreshed", newline]
+      M.continue $ st & systemProcesses .~ procs & logMessages %~ (++ newLog)
     V.EvKey (V.KChar 'k') [V.MCtrl] -> do
       let (currentProcess :: Maybe Pid) =
             case listSelectedElement (st ^. searchResult) of
@@ -254,7 +258,3 @@ main = do
   procs <- getAllProcessInfoDS
   defaultMain killApp $ initialState procs
   return ()
--- main :: IO ()
--- main = do
---   let x = selectedPid "polkitd (1043)"
---   print x
