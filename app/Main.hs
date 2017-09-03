@@ -38,7 +38,9 @@ bindings :: [String]
 bindings =
   [ "Esc : Quit the application"
   , newline
-  , "Ctrl-k : Send SIGINT"
+  , "Ctrl-k : Send SIGTERM"
+  , newline
+  , "Ctrl-K : Send SIGKILL (kill -9)"
   , newline
   , "Ctrl-i : Process information"
   , newline
@@ -146,6 +148,26 @@ appEvent st (T.VtyEvent ev) =
     V.EvKey (V.KChar '\t') [] -> M.continue $ st & focusRing %~ F.focusNext
     V.EvKey (V.KChar 'n') [V.MCtrl] -> M.continue $ st & searchResult %~ listMoveDown
     V.EvKey (V.KChar 'p') [V.MCtrl] -> M.continue $ st & searchResult %~ listMoveUp
+    V.EvKey (V.KChar 'k') [V.MCtrl] -> do
+      let (currentProcess :: Maybe Pid) =
+            case listSelectedElement (st ^. searchResult) of
+              Nothing -> Nothing
+              Just (_, pname) -> either (const Nothing) Just (selectedPid pname)
+      case currentProcess of
+        Nothing -> M.continue st
+        Just pid -> do
+          let procs = filterPid pid (st ^. systemProcesses)
+          case procs of
+            [] -> M.continue st
+            ((Right process):_) -> do
+              liftIO $ softKill (procPid process)
+              let newlog =
+                    [ newline
+                    , "SIGTERM signal sent to " <> (show $ procPid process)
+                    , newline
+                    ]
+              M.continue $ st & logMessages %~ (++ newlog)
+            _ -> M.continue st
     V.EvKey (V.KChar 'j') [V.MMeta] -> do
       let (currentProcess :: Maybe Pid) =
             case listSelectedElement (st ^. searchResult) of
