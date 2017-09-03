@@ -35,11 +35,11 @@ keyBindingWidget = str ("Key Bindings" <> newline <> newline <> fold bindings)
 
 bindings :: [String]
 bindings =
-  [ "q : Quit the application"
+  [ "Esc : Quit the application"
   , newline
-  , "k : Send SIGINT"
+  , "Ctrl-k : Send SIGINT"
   , newline
-  , "i : Process information"
+  , "Ctrl-i : Process information"
   , newline
   , "r : Refresh"
   ]
@@ -84,7 +84,7 @@ listDrawElement :: Bool -> Text -> Widget SearchWidget
 listDrawElement sel a =
   let selStr s =
         if sel
-          then txt $ ("* " <> s)
+          then withAttr "foundFull" $ txt s
           else txt s
   in selStr a
 
@@ -132,7 +132,7 @@ appEvent st (T.VtyEvent ev) =
   case ev of
     V.EvKey V.KEsc [] -> M.halt st
     V.EvKey (V.KChar '\t') [] -> M.continue $ st & focusRing %~ F.focusNext
-    V.EvKey (V.KChar 'i') [] -> M.continue $ st & logMessages %~ (++ sampleLog)
+    V.EvKey (V.KChar 'j') [V.MMeta] -> M.continue $ st & logMessages %~ (++ sampleLog)
     V.EvKey V.KBackTab [] -> M.continue $ st & focusRing %~ F.focusPrev
     _ ->
       case F.focusGetCurrent (st ^. focusRing) of
@@ -175,6 +175,7 @@ theMap =
     , (E.editFocusedAttr, V.black `on` V.yellow)
     , (listAttr, fg V.cyan)
     , (listSelectedFocusedAttr, V.black `on` V.yellow)
+    , ("foundFull", V.black `on` V.yellow)
     ]
 
 processesToNames :: [Either String ProcessInfo] -> [Text]
