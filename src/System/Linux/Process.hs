@@ -15,6 +15,7 @@ import System.Posix.Files (isDirectory, getFileStatus)
 import System.Directory (listDirectory)
 import Control.Monad (filterM)
 import System.Posix.Signals
+import Control.Exception.Safe
 
 newtype Pid = Pid
   { pid :: Int
@@ -119,8 +120,14 @@ samePid pid (Right pinfo) = (procPid pinfo) == pid
 filterPid :: Pid -> [Either String ProcessInfo] -> [Either String ProcessInfo]
 filterPid pid = filter (samePid pid)
 
-softKill :: Pid -> IO ()
-softKill (Pid pid) = signalProcess softwareTermination (fromIntegral pid)
+data KillResult
+  = KillDone
+  | KillError SomeException
+
+softKill :: Pid -> IO KillResult
+softKill (Pid pid) =
+  let action = signalProcess softwareTermination (fromIntegral pid) >> return KillDone
+  in action `catch` (\(e :: SomeException) -> return $ KillError e)
 
 hardKill :: Pid -> IO ()
 hardKill (Pid pid) = signalProcess killProcess (fromIntegral pid)
